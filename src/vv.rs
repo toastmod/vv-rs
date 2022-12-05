@@ -93,8 +93,7 @@ impl FormantProc {
         for i in 0..self.buffer_size {
             self.v1[i] = Complex::new(buffer[i], 0.0);
         }
-
-        // ! KissFFT uses 2*PI as it's maximum, RustFFT does not use this.
+        
         for i in 0..self.buffer_size {
             let r = (i as f64) / (self.buffer_size as f64);
             let w = 0.5-(0.5*f64::cos(2f64*std::f64::consts::PI * r));
