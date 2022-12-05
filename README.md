@@ -1,14 +1,5 @@
-# vv
-VST3 Voice Changer Implementation
+# vv-rs
+A rust fork of [vv](https://github.com/ejmahler/RustFFT) using [RustFFT](https://github.com/ejmahler/RustFFT) and [nih-plug](https://github.com/robbert-vdh/nih-plug).
 
-## Requirements
-
-### Supported Compilers
-- Visual C++ 2017
-
-### External Libraries
-- Boost C++ Libraries (>= 1.66.1)
-- [KissFFT](http://kissfft.sourceforge.net/) ([modified](vv/src/kissfft.hh))
-
-## License
-The BSD 3-Clause License (see [LICENSE](LICENSE))
+# About
+vv is a VST3 pitch and formant shifter. 
