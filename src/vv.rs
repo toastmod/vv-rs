@@ -4,6 +4,7 @@ use rustfft;
 use rustfft::Fft;
 use rustfft::num_complex::{Complex, ComplexFloat};
 use rustfft::num_traits::{FloatConst, Zero};
+use rustfft::algorithm::Radix4;
 
 pub struct FormantProc {
     dummy: Vec<Complex<f32>>,
@@ -20,6 +21,8 @@ pub struct FormantProc {
     v7: Vec<f32>,
     buffer_size: usize,
     nsdf_size: usize,
+    // fft: Radix4<f32>,
+    // ifft: Radix4<f32>,
     fft: Arc<dyn Fft<f32>>,
     ifft: Arc<dyn Fft<f32>>,
     last_peak_index: Option<usize>,
@@ -31,6 +34,8 @@ impl FormantProc {
         let nsdf_size = buffer_size/2;
         let fft = rustfft::FftPlanner::new().plan_fft_forward(buffer_size + nsdf_size);
         let ifft = rustfft::FftPlanner::new().plan_fft_inverse(buffer_size + nsdf_size);
+        // let fft = Radix4::new(buffer_size + nsdf_size, rustfft::FftDirection::Forward);
+        // let ifft = Radix4::new(buffer_size + nsdf_size, rustfft::FftDirection::Inverse);
         // let scratch_size = fft.get_outofplace_scratch_len();
         // let iscratch_size = ifft.get_outofplace_scratch_len();
         Self {

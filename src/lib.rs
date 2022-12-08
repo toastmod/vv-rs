@@ -1,5 +1,32 @@
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn sin_test() {
+        let bufsize = 4096;
+        let mut proc = crate::vv::FormantProc::new(bufsize, 44100);
+        let mut buf = vec![0f32; bufsize];
+
+        for i in 0..4096 {
+            let ratio = i as f64 / bufsize as f64;
+            let v = f64::sin(10.0 * ratio * std::f64::consts::PI*2.0);
+
+            buf[i] = v as f32;
+        }
+
+        proc.process(&mut buf, 1.5, 1.2);
+
+        for i in 0..bufsize {
+            println!("{}",buf[i]);
+        }
+
+    }
+}
+
+pub mod vv;
+
 use nih_plug::prelude::*;
-use std::sync::Arc;
+use vv::FormantProc;
+use std::{sync::Arc, collections::VecDeque};
 
 // This is a shortened version of the gain example with most comments removed, check out
 // https://github.com/robbert-vdh/nih-plug/blob/master/plugins/examples/gain/src/lib.rs to get
@@ -7,6 +34,12 @@ use std::sync::Arc;
 
 struct VV {
     params: Arc<VVParams>,
+    proc: FormantProc,
+    sample_rate: usize,
+    buffer_size: usize,
+    input_buffer: Vec<f32>,
+    output_buffer: VecDeque<f32>,
+    cursor: usize,
 }
 
 #[derive(Params)]
@@ -15,14 +48,29 @@ struct VVParams {
     /// these IDs remain constant, you can rename and reorder these fields as you wish. The
     /// parameters are exposed to the host in the same order they were defined. In this case, this
     /// gain parameter is stored as linear gain while the values are displayed in decibels.
-    #[id = "gain"]
-    pub gain: FloatParam,
+    #[id = "Formant"]
+    pub formant: FloatParam,
+
+    #[id = "FormantAdd"]
+    pub fadd: FloatParam,
+
+    #[id = "Pitch"]
+    pub pitch: FloatParam,
+
+    #[id = "PitchAdd"]
+    pub padd: FloatParam,
 }
 
 impl Default for VV {
     fn default() -> Self {
         Self {
             params: Arc::new(VVParams::default()),
+            proc: FormantProc::new(1024, 44100),
+            sample_rate: 0,
+            buffer_size: 0,
+            input_buffer: vec![],
+            output_buffer: VecDeque::new(),
+            cursor: 0, 
         }
     }
 }
@@ -33,26 +81,26 @@ impl Default for VVParams {
             // This gain is stored as linear gain. NIH-plug comes with useful conversion functions
             // to treat these kinds of parameters as if we were dealing with decibels. Storing this
             // as decibels is easier to work with, but requires a conversion for every sample.
-            gain: FloatParam::new(
-                "Gain",
-                util::db_to_gain(0.0),
-                FloatRange::Skewed {
-                    min: util::db_to_gain(-30.0),
-                    max: util::db_to_gain(30.0),
-                    // This makes the range appear as if it was linear when displaying the values as
-                    // decibels
-                    factor: FloatRange::gain_skew_factor(-30.0, 30.0),
-                },
+            formant: FloatParam::new(
+                "Formant",
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 0.5 }
+            ),
+            fadd: FloatParam::new(
+                "FormantAdd",
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 5.0 }
+            ),
+            pitch: FloatParam::new(
+                "Pitch",
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 0.5 }
+            ),
+            padd: FloatParam::new(
+                "PitchAdd",
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 5.0 }
             )
-            // Because the gain parameter is stored as linear gain instead of storing the value as
-            // decibels, we need logarithmic smoothing
-            .with_smoother(SmoothingStyle::Logarithmic(50.0))
-            .with_unit(" dB")
-            // There are many predefined formatters we can use here. If the gain was stored as
-            // decibels instead of as a linear gain value, we could have also used the
-            // `.with_step_size(0.1)` function to get internal rounding.
-            .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
-            .with_string_to_value(formatters::s2v_f32_gain_to_db()),
         }
     }
 }
@@ -91,6 +139,15 @@ impl Plugin for VV {
         _buffer_config: &BufferConfig,
         _context: &mut impl InitContext<VV>,
     ) -> bool {
+
+        self.sample_rate = _buffer_config.sample_rate as usize;
+        self.buffer_size = match _buffer_config.min_buffer_size {
+            Some(bufsize) => bufsize as usize,
+            None => _buffer_config.max_buffer_size as usize,
+        }; 
+
+        self.input_buffer = vec![0f32; self.buffer_size];
+
         // Resize buffers and perform other potentially expensive initialization operations here.
         // The `reset()` function is always called right after this function. You can remove this
         // function if you do not need it.
@@ -100,6 +157,7 @@ impl Plugin for VV {
     fn reset(&mut self) {
         // Reset buffers and envelopes here. This can be called from the audio thread and may not
         // allocate. You can remove this function if you do not need it.
+        self.proc = FormantProc::new(self.buffer_size, self.sample_rate);
     }
 
     fn process(
@@ -108,14 +166,32 @@ impl Plugin for VV {
         _aux: &mut AuxiliaryBuffers,
         _context: &mut impl ProcessContext<VV>,
     ) -> ProcessStatus {
-        for channel_samples in buffer.iter_samples() {
-            // Smoothing is optionally built into the parameters themselves
-            let gain = self.params.gain.smoothed.next();
+        let mut chunks = buffer.as_slice();
 
-            for sample in channel_samples {
-                *sample *= gain;
+        let formant_shift = self.params.formant.value() as f64 + self.params.fadd.value() as f64;
+        let pitch_shift = self.params.pitch.value() as f64 + self.params.padd.value() as f64;
+
+        for i in 0..chunks[0].len() {
+            self.input_buffer[self.cursor] = chunks[0][i];
+            self.cursor += 1;
+            if self.cursor == self.buffer_size {
+                self.proc.process(&mut self.input_buffer, formant_shift, pitch_shift);
+                for x in 0..self.buffer_size {
+                    self.output_buffer.push_back(self.input_buffer[i]);
+                }
+                self.cursor = 0;
             }
+
+            let os = match self.output_buffer.pop_front() {
+                Some(s) => s,
+                None => 0f32,
+            };
+
+            chunks[0][i] = os;
+            chunks[1][i] = os;
         }
+        
+        
 
         ProcessStatus::Normal
     }
