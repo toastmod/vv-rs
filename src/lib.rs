@@ -28,10 +28,6 @@ use nih_plug::prelude::*;
 use vv::FormantProc;
 use std::{sync::Arc, collections::VecDeque};
 
-// This is a shortened version of the gain example with most comments removed, check out
-// https://github.com/robbert-vdh/nih-plug/blob/master/plugins/examples/gain/src/lib.rs to get
-// started
-
 struct VV {
     params: Arc<VVParams>,
     proc: FormantProc,
@@ -44,10 +40,7 @@ struct VV {
 
 #[derive(Params)]
 struct VVParams {
-    /// The parameter's ID is used to identify the parameter in the wrappred plugin API. As long as
-    /// these IDs remain constant, you can rename and reorder these fields as you wish. The
-    /// parameters are exposed to the host in the same order they were defined. In this case, this
-    /// gain parameter is stored as linear gain while the values are displayed in decibels.
+
     #[id = "Formant"]
     pub formant: FloatParam,
 
@@ -78,9 +71,6 @@ impl Default for VV {
 impl Default for VVParams {
     fn default() -> Self {
         Self {
-            // This gain is stored as linear gain. NIH-plug comes with useful conversion functions
-            // to treat these kinds of parameters as if we were dealing with decibels. Storing this
-            // as decibels is easier to work with, but requires a conversion for every sample.
             formant: FloatParam::new(
                 "Formant",
                 0.0,
@@ -108,7 +98,7 @@ impl Default for VVParams {
 impl Plugin for VV {
     const NAME: &'static str = "vvrs";
     const VENDOR: &'static str = "Andrew Numrich";
-    const URL: &'static str = "https://youtu.be/dQw4w9WgXcQ";
+    const URL: &'static str = "";
     const EMAIL: &'static str = "anumrich@hotmail.com";
 
     const VERSION: &'static str = "0.0.1";
@@ -148,15 +138,10 @@ impl Plugin for VV {
 
         self.input_buffer = vec![0f32; self.buffer_size];
 
-        // Resize buffers and perform other potentially expensive initialization operations here.
-        // The `reset()` function is always called right after this function. You can remove this
-        // function if you do not need it.
         true
     }
 
     fn reset(&mut self) {
-        // Reset buffers and envelopes here. This can be called from the audio thread and may not
-        // allocate. You can remove this function if you do not need it.
         self.proc = FormantProc::new(self.buffer_size, self.sample_rate);
     }
 
@@ -206,7 +191,6 @@ impl Plugin for VV {
     const HARD_REALTIME_ONLY: bool = false;
 
     fn task_executor(&self) -> TaskExecutor<Self> {
-        // In the default implementation we can simply ignore the value
         Box::new(|_| ())
     }
 
@@ -233,10 +217,7 @@ impl ClapPlugin for VV {
 
 impl Vst3Plugin for VV {
     const VST3_CLASS_ID: [u8; 16] = *b"vvrsplanaria!!!!";
-
-    // And don't forget to change these categories, see the docstring on `VST3_CATEGORIES` for more
-    // information
-    const VST3_CATEGORIES: &'static str = "Fx|Dynamics";
+    const VST3_CATEGORIES: &'static str = "Fx|Misc";
 }
 
 nih_export_clap!(VV);
