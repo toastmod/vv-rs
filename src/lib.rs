@@ -84,7 +84,7 @@ impl Default for VVParams {
             formant: FloatParam::new(
                 "Formant",
                 0.0,
-                FloatRange::Linear { min: 0.0, max: 0.5 }
+                FloatRange::Linear { min: 0.0, max: 1.5 }
             ),
             fadd: FloatParam::new(
                 "FormantAdd",
@@ -94,7 +94,7 @@ impl Default for VVParams {
             pitch: FloatParam::new(
                 "Pitch",
                 0.0,
-                FloatRange::Linear { min: 0.0, max: 0.5 }
+                FloatRange::Linear { min: 0.0, max: 1.5 }
             ),
             padd: FloatParam::new(
                 "PitchAdd",
