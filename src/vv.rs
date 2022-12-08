@@ -32,7 +32,7 @@ impl FormantProc {
     pub fn new(buffer_size: usize, sample_rate: usize) -> Self {
 
         let nsdf_size = buffer_size/2;
-        let fft = rustfft::FftPlanner::new().plan_fft_forward(buffer_size + nsdf_size);
+        let mut fft = rustfft::FftPlanner::new().plan_fft_forward(buffer_size + nsdf_size);
         let ifft = rustfft::FftPlanner::new().plan_fft_inverse(buffer_size + nsdf_size);
         // let fft = Radix4::new(buffer_size + nsdf_size, rustfft::FftDirection::Forward);
         // let ifft = Radix4::new(buffer_size + nsdf_size, rustfft::FftDirection::Inverse);
@@ -59,20 +59,20 @@ impl FormantProc {
         }
     }
 
-    fn norm(v: Complex<f32>) -> Complex<f32> {
+    pub fn norm(v: Complex<f32>) -> Complex<f32> {
         // Complex::new((v.re * v.re) + (v.im * v.im), 0.0)
         Complex::new(v.abs() * v.abs(), 0.0)
     }
 
-    fn easing(x: f64) -> f64 {
+    pub fn easing(x: f64) -> f64 {
         (1.0 - f64::cos(f64::PI() * x)) / 2f64
     }
 
-    fn lerp(a: f64, b: f64, f: f64) -> f64 {
+    pub fn lerp(a: f64, b: f64, f: f64) -> f64 {
         a + f * (b - a)
     }
 
-    fn interpolate(x1: f64, x2: f64, ratio: f64) -> f64 {
+    pub fn interpolate(x1: f64, x2: f64, ratio: f64) -> f64 {
         Self::lerp(x1, x2, Self::easing(ratio))
     }
 

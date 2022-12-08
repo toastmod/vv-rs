@@ -1,5 +1,7 @@
 #[cfg(test)]
 mod tests {
+    use rustfft::{num_complex::Complex, num_traits::Zero};
+
     #[test]
     fn sin_test() {
         let bufsize = 4096;
@@ -20,9 +22,27 @@ mod tests {
         }
 
     }
+
+    #[test]
+    fn display_calcs() {
+        let mut norms: Vec<Complex<f32>> = vec![Complex::zero(); 4096];
+        let mut normsqs: Vec<f32> = vec![0f32; 4096];
+        for i in 0..4096 {
+            let ratio = i as f64 / 4096f64;
+            let v = f64::sin(10.0 * ratio * std::f64::consts::PI*2.0);
+
+            // norms[i] = Complex::new(v as f32, 0.0).norm();
+            norms[i] = crate::vv::FormantProc::norm(Complex::new(v as f32, 0.0));
+            normsqs[i] = Complex::new(v as f32, 0.0).norm_sqr();
+        }
+
+        println!("DONE!");
+    }
 }
 
 pub mod vv;
+mod util;
+mod kissfft;
 
 use nih_plug::prelude::*;
 use vv::FormantProc;
