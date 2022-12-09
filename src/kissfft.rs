@@ -114,25 +114,33 @@ impl KissFFT {
         fft_out_idx = fout_beg;
 
         match p {
-            2 => kf_bfly2(fft_out,fft_out_idx,fstride,m),
-            3 => kf_bfly3(fft_out,fft_out_idx,fstride,m),
-            4 => kf_bfly4(fft_out,fft_out_idx,fstride,m),
-            5 => kf_bfly5(fft_out,fft_out_idx,fstride,m),
-            _ => kf_bfly_generic(fft_out,fft_out_idx,fstride,m,p),
+            2 => self.kf_bfly2(fft_out,fft_out_idx,fstride,m),
+            3 => self.kf_bfly3(fft_out,fft_out_idx,fstride,m),
+            4 => self.kf_bfly4(fft_out,fft_out_idx,fstride,m),
+            5 => self.kf_bfly5(fft_out,fft_out_idx,fstride,m),
+            _ => self.kf_bfly_generic(fft_out,fft_out_idx,fstride,m,p),
         }
     }
 
-    pub fn transform_real(&mut self, src: &mut [Float], dst: &mut [Complex<Float>]) {
-        let N = self.nfft;
-        if(N == 0) {
-            return;
+    // * leaving this unfinished because it is unused 
+    // pub fn transform_real(&mut self, src: &mut [Float], dst: &mut [Complex<Float>]) {
+    //     let N = self.nfft;
+    //     if(N == 0) {
+    //         return;
+    //     }
+    // }
+
+    fn kf_bfly2(&mut self, fout: &mut [Complex<Float>], fstrid: usize, m: usize) {
+        for k in 0..m {
+            let t: Complex<Float> = fout[m+k] * self.twiddles[k*fstride];
+            fout[m+k] = fout[k] - t;
+            fout[k] += t;
         }
+    }
 
-        // self.transform(src.iter().map(|x|{
-
-        // }).s, dst, None, None, None);
-
+    fn kf_bfly3(&mut self, fout: &mut [Complex<Float>], fstrid: usize, m: usize) {
 
     }
+    
 
 }
