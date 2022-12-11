@@ -1,4 +1,3 @@
-use crate::util::do_while;
 use rustfft::num_complex::Complex;
 use rustfft::num_traits::Zero;
 
@@ -52,12 +51,6 @@ impl KissFFT {
                 break;
             }
         }
-        do_while(
-            &mut || {
-
-            },
-            &mut || n>1
-        );
 
         Self {
             nfft,
