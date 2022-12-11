@@ -6,6 +6,8 @@ use rustfft::num_complex::{Complex, ComplexFloat};
 use rustfft::num_traits::{FloatConst, Zero};
 use rustfft::algorithm::Radix4;
 
+use crate::kissfft::KissFFT;
+
 pub struct FormantProc {
     dummy: Vec<Complex<f32>>,
     sample_rate: usize,
@@ -23,8 +25,8 @@ pub struct FormantProc {
     nsdf_size: usize,
     // fft: Radix4<f32>,
     // ifft: Radix4<f32>,
-    fft: Arc<dyn Fft<f32>>,
-    ifft: Arc<dyn Fft<f32>>,
+    fft: KissFFT,
+    ifft: KissFFT,
     last_peak_index: Option<usize>,
 }
 
@@ -32,12 +34,8 @@ impl FormantProc {
     pub fn new(buffer_size: usize, sample_rate: usize) -> Self {
 
         let nsdf_size = buffer_size/2;
-        let mut fft = rustfft::FftPlanner::new().plan_fft_forward(buffer_size + nsdf_size);
-        let ifft = rustfft::FftPlanner::new().plan_fft_inverse(buffer_size + nsdf_size);
-        // let fft = Radix4::new(buffer_size + nsdf_size, rustfft::FftDirection::Forward);
-        // let ifft = Radix4::new(buffer_size + nsdf_size, rustfft::FftDirection::Inverse);
-        // let scratch_size = fft.get_outofplace_scratch_len();
-        // let iscratch_size = ifft.get_outofplace_scratch_len();
+        let mut fft = KissFFT::new(buffer_size, false);
+        let mut ifft = KissFFT::new(buffer_size, true);
         Self {
             dummy: vec![Complex::zero(); buffer_size + nsdf_size],
             sample_rate,
@@ -106,9 +104,7 @@ impl FormantProc {
             assert_eq!(false,self.v2[i].re.is_nan());
         }
 
-        self.v3[0..self.buffer_size].copy_from_slice(self.v1.as_slice());
-        self.v3[self.buffer_size..self.buffer_size+self.nsdf_size].copy_from_slice(&self.dummy.as_slice()[0..self.nsdf_size]);
-        self.fft.process(self.v3.as_mut_slice());
+        self.fft.transform(self.v2.as_mut_slice(), self.v3.as_mut_slice(), None,None,None);
 
         let cutoff_hz = 800f64;
         let cutoff_index = f64::round(cutoff_hz * self.buffer_size as f64 / self.sample_rate as f64) as usize;
@@ -118,8 +114,8 @@ impl FormantProc {
             self.v4[self.buffer_size - i -1] = Self::norm(self.v3[self.buffer_size - i - 1]);
         }
 
-        self.v5.copy_from_slice(self.v4.as_slice());
-        self.ifft.process(self.v5.as_mut_slice());
+        self.ifft.transform(self.v4.as_mut_slice(),self.v5.as_mut_slice(),None,None,None);
+
         for i in 0..(self.buffer_size + self.nsdf_size) {
             self.v5[i] /= ((self.buffer_size+self.nsdf_size) as f32);
         }

@@ -216,7 +216,7 @@ impl KissFFT {
 
     fn kf_bfly5(&mut self, fout: &mut [Complex<Float>], fstride: usize, m: usize) {
         let (mut f0,mut f1,mut f2,mut f3,mut f4) = (0usize,0usize,0usize,0usize,0usize);
-        let mut scratch: [Complex<Float>; 7] = [Complex::zero(); 7];
+        let mut scratch: [Complex<Float>; 13] = [Complex::zero(); 13];
         let ya = self.twiddles[fstride*m];
         let yb = self.twiddles[fstride*2*m];
 
