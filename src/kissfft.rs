@@ -8,6 +8,7 @@ pub struct KissFFT {
     nfft: usize,
     inverse: bool,
     twiddles: Vec<Complex<Float>>,
+    generic_scratch: Vec<Complex<Float>>,
     stage_radix: Vec<usize>,
     stage_remainder: Vec<usize>,
 }
@@ -28,24 +29,32 @@ impl KissFFT {
         let mut n = nfft.clone();
         let mut p = 4;
 
-        do_while(
-            &mut || {
-                while((n%p) != 0) {
-                    match p {
-                        4 => {p=2;},
-                        2 => {p=3;},
-                        _ => {p+=2;}
-                    };
+        loop {
 
-                    if p*p > n {
-                        p=n;
-                    }
+            while((n%p) != 0) {
+                match p {
+                    4 => {p=2;},
+                    2 => {p=3;},
+                    _ => {p+=2;}
+                };
 
+                if p*p > n {
+                    p=n;
                 }
 
-                n /= p;
-                stage_radix.push(p);
-                stage_remainder.push(n);
+            }
+
+            n /= p;
+            stage_radix.push(p);
+            stage_remainder.push(n);
+
+            if(!(n>1)){
+                break;
+            }
+        }
+        do_while(
+            &mut || {
+
             },
             &mut || n>1
         );
@@ -55,7 +64,8 @@ impl KissFFT {
             inverse,
             twiddles,
             stage_radix,
-            stage_remainder
+            stage_remainder,
+            generic_scratch: vec![],
         }
     }
 
@@ -82,43 +92,42 @@ impl KissFFT {
         if (m==1) {
             // do while
 
-            do_while(
-                &mut ||{
-                    fft_out[fft_out_idx] = fft_in[fft_in_idx];
-                    fft_in_idx += fstride.unwrap_or(1usize)*in_stride.unwrap_or(1usize);
-                },
-                &mut ||{
-                    ({
+            loop {
+                fft_out[fft_out_idx] = fft_in[fft_in_idx];
+                fft_in_idx += fstride.unwrap_or(1usize)*in_stride.unwrap_or(1usize);
+                
+                if(!({
                         fft_out_idx += 1;
                         fft_out_idx
-                    } != fout_end)
+                    } != fout_end)){
+                    break;
                 }
-            );
+            }
+
         }else{
             // do while
-            do_while(
-                &mut ||{
-                    fft_out[fft_out_idx] = fft_in[fft_in_idx];
-                    fft_in_idx += fstride.unwrap_or(1usize)*in_stride.unwrap_or(1usize);
-                },
+            loop {
 
-                &mut || {
-                    ({
-                        fft_out_idx += m;
+                fft_out[fft_out_idx] = fft_in[fft_in_idx];
+                fft_in_idx += fstride.unwrap_or(1usize)*in_stride.unwrap_or(1usize); 
+
+                if(!({fft_out_idx += m;
                         fft_out_idx
-                    } != fout_end)
+                    } != fout_end)){
+                    break;
                 }
-            );
+            }
         }
 
         fft_out_idx = fout_beg;
 
+        let end = fft_out.len();
         match p {
-            2 => self.kf_bfly2(&mut fft_out[fft_out_idx..fft_out.len()],fstride.unwrap_or(1usize),m),
-            3 => self.kf_bfly3(&mut fft_out[fft_out_idx..fft_out.len()],fstride.unwrap_or(1usize),m),
-            4 => self.kf_bfly4(&mut fft_out[fft_out_idx..fft_out.len()],fstride.unwrap_or(1usize),m),
-            5 => self.kf_bfly5(&mut fft_out[fft_out_idx..fft_out.len()],fstride.unwrap_or(1usize),m),
-            _ => self.kf_bfly_generic(fft_out,fft_out_idx,fstride,m,p),
+            2 => self.kf_bfly2(&mut fft_out[fft_out_idx..end],fstride.unwrap_or(1usize),m),
+            3 => self.kf_bfly3(&mut fft_out[fft_out_idx..end],fstride.unwrap_or(1usize),m),
+            4 => self.kf_bfly4(&mut fft_out[fft_out_idx..end],fstride.unwrap_or(1usize),m),
+            5 => self.kf_bfly5(&mut fft_out[fft_out_idx..end],fstride.unwrap_or(1usize),m),
+            _ => self.kf_bfly_generic(&mut fft_out[fft_out_idx..end],fstride.unwrap_or(1usize),m,p),
         }
     }
 
@@ -151,7 +160,8 @@ impl KissFFT {
 
         let mut fout_offset = 0usize;
 
-        do_while(&mut||{
+        loop {
+
             scratch[1] = fout[fout_offset+m] * self.twiddles[tw1];
             scratch[2] = fout[fout_offset+m2] * self.twiddles[tw2];
 
@@ -170,11 +180,14 @@ impl KissFFT {
             fout[fout_offset+m] += Complex::new(-scratch[0].im, scratch[0].re);
 
             fout_offset += 1;
-            
-        }, &mut || {
-            k -= 1;
-            k > 0
-        });
+
+            if(!({
+                k -= 1;
+                k > 0
+            })) {
+                break;
+            }
+        }
 
     }
 
@@ -266,8 +279,11 @@ impl KissFFT {
 
     fn kf_bfly_generic(&mut self, fout: &mut [Complex<Float>], fstride: usize, m: usize, p: usize) {
         // let mut twiddles = &self.twiddles[0];
+        if self.generic_scratch.len() < p {
+            self.generic_scratch = vec![Complex::zero(); p];
+        }
 
-        let mut scratchbuf = vec![Complex::zero(); p];
+        let scratchbuf = &mut self.generic_scratch;
 
         for u in 0..m {
             let mut k = u;
